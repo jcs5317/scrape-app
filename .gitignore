@@ -1,2 +1,2 @@
-node_modules
-data/db
+node_modules/
+.DS_Store
