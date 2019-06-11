@@ -1,141 +1,69 @@
-// Dependencies
-var express = require("express");
-var mongojs = require("mongojs");
-// Require axios and cheerio. This makes the scraping possible
-var axios = require("axios");
-var cheerio = require("cheerio");
-
-// Initialize Express
-var app = express();
-
-// Database configuration
-var databaseUrl = "scraper";
-var collections = ["scrapedData"];
-
-// Hook mongojs configuration to the db variable
-var db = mongojs(databaseUrl, collections);
-db.on("error", function(error) {
-  console.log("Database Error:", error);
-});
-
-// Main route (simple Hello World Message)
-app.get("/", function(req, res) {
-  res.send("Hello world");
-});
-
-// Retrieve data from the db
-app.get("/all", function(req, res) {
-  // Find all results from the scrapedData collection in the db
-  db.scrapedData.find({}, function(error, found) {
-    // Throw any errors to the console
-    if (error) {
-      console.log(error);
-    }
-    // If there are no errors, send the data to the browser as json
-    else {
-      res.json(found);
-    }
-  });
-});
-
-// Scrape data from one site and place it into the mongodb db
-app.get("/scrape", function(req, res) {
-    // Make a request via axios for the news section of `ycombinator`
-    axios.get("https://news.ycombinator.com/").then(function(response) {
-      // Load the html body from axios into cheerio
-      var $ = cheerio.load(response.data);
-      // For each element with a "title" class
-      $(".title").each(function(i, element) {
-        // Save the text and href of each link enclosed in the current element
-        var title = $(element).children("a").text();
-        var link = $(element).children("a").attr("href");
-  
-        // If this found element had both a title and a link
-        if (title && link) {
-          // Insert the data in the scrapedData db
-          db.scrapedData.insert({
-            title: title,
-            link: link
-          },
-          function(err, inserted) {
-            if (err) {
-              // Log the error if one is encountered during the query
-              console.log(err);
-            }
-            else {
-              // Otherwise, log the inserted data
-              console.log(inserted);
-            }
-          });
-        }
-      });
-    });
-  
-    // Send a "Scrape Complete" message to the browser
-    res.send("Scrape Complete");
-  });
-  
-  
-  // Listen on port 3000
-  app.listen(3000, function() {
-    console.log("App running on port 3000!");
-  });
-  
   // Dependencies
 var express = require('express');
 var exphbs  = require('express-handlebars');
-var app = express();
-var bodyParser = require('body-parser');
 var logger = require('morgan');
 var mongoose = require('mongoose');
-
-// Handlebars setup
-app.engine('handlebars', exphbs({defaultLayout: 'main'}));
-app.set('view engine', 'handlebars');
 
 // Scraping tools
 var request = require('request');
 var cheerio = require('cheerio');
 
+var PORT = process.env.PORT || 3000;
+var db = require("./models");
+var app = express()
+
 // Use morgan and bodyparser with app
 app.use(logger('dev'));
-app.use(bodyParser.urlencoded({
-    extended: false
-}));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+// Make public a static folder
+app.use(express.static("public"));
 
-// Make public a static dir
-app.use(express.static('public'));
+// Handlebars setup
+app.engine('handlebars', exphbs({defaultLayout: 'main'}));
+app.set('view engine', 'handlebars');
 
 // Database configuration with mongoose
-// UNCOMMENT WHEN HEROKU:ENTER MONGOOSE CONNECTION URI FROM TERMINAL
-mongoose.connect('mongodb://heroku_bgl64psv:ou5kf61v2vlq2v8lcva579c7fb@ds031832.mlab.com:31832/heroku_bgl64psv');
+var MONGODB = process.env.MONGODB_URI || "mongodb://localhost/newsdb";
 
-var db = mongoose.connection;
+mongoose.Promise = Promise;
+
+mongoose.connect(MONGODB);
 
 // Show any mongoose errors
-db.on('error', function(err) {
+mongoose.on('error', function(err) {
     console.log('Mongoose Error: ', err);
 });
 
 // Once logged in to the db through mongoose, log a success message
-db.once('open', function() {
+mongoose.once('open', function() {
     console.log('Mongoose connection successful.');
 });
 
-// Bring in the Note and Article models
-var Note = require('./models/Note.js');
-var Article = require('./models/Article.js');
-
-
+//app.use(routes)
 // ROUTES
 // ======
 
-// app.get('/', function (req, res) {
-//     res.render('index.html');
-// });
+app.get('/', function (req, res) {
 
-// Index route that scrapes the website
-app.get('/scrape', function(req, res) {
+    res.render('home');
+});
+
+// this will get the articles we scraped from the mongoDB
+//html route
+//find where the save is true
+app.get('/articles', function(req, res){
+    // grab every doc in the Articles array
+    Article.find()
+        .then(function (doc, err){
+            console.log(doc)
+            res.render("saved", doc)
+        })
+});
+
+// when button is clicked o home page that scrapes the website
+//save all the unique articles to the db and return data as json to client side js
+app.get('/api/scrape', function(req, res) {
 
     // Grab the body of the html with request
     request('https://www.reddit.com/r/news/', function(error, response, html) {
@@ -172,23 +100,8 @@ app.get('/scrape', function(req, res) {
     });
 });
 
-// this will get the articles we scraped from the mongoDB
-app.get('/articles', function(req, res){
-    // grab every doc in the Articles array
-    Article.find({}, function(err, doc){
-        // log any errors
-        if (err){
-            console.log(err);
-        }
-        // or send the doc to the browser as a json object
-        else {
-            res.json(doc);
-        }
-    });
-});
-
-// grab an article by it's ObjectId
-app.get('/articles/:id', function(req, res){
+// grab an article by it's ObjectId optional
+app.get('/api/articles/:id', function(req, res){
     // using the id passed in the id parameter,
     // prepare a query that finds the matching one in our db...
     Article.findOne({'_id': req.params.id})
@@ -207,10 +120,19 @@ app.get('/articles/:id', function(req, res){
         });
 });
 
+//update an articles saved status to true to false ove false to true
+// send back json to client side js
+app.put('/api/articles/:id', function(req, res){
 
-// replace the existing note of an article with a new one
-// or if no note exists for an article, make the posted note it's note.
-app.post('/articles/:id', function(req, res){
+});
+
+//optional to delete article from db
+app.delete('/api/articles/:id', function(req, res) {
+
+})
+
+// replace the existing note of an article with a new one 
+app.post('/api/notes/articles/:id', function(req, res){
     // create a new note and pass the req.body to the entry.
     var newNote = new Note(req.body);
 
@@ -238,10 +160,11 @@ app.post('/articles/:id', function(req, res){
                 });
         }
     });
-});
+})
 
-
+// update the existing note of an article optional
+app.put('/api/notes/:idi/articles/:id')
 // listen on port 3000
-app.listen(process.env.PORT || 3000, function() {
-    console.log('App running on port 3000!');
+app.listen(PORT, function() {
+    console.log('App running on port ' + PORT + ' !');
 });
