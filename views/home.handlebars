@@ -1,11 +1,41 @@
-<h1>Scrape complete! You just scraped some info from {{scrapesource}}</h1>
+<div id='wrapper'>
+    <h1>Scrape complete!</h1>
+    <h2><i>You just scraped some info from {{scrapesource}}</i></h2>
+    <div class="container-fluid article-container">
 
-
+  {{#if articles}}
+    {{#each articles}}
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h4>
+          <a class="article-link" target="_blank" href="{{this.link}}">{{this.title}}</a>
+          {{#if this.isSaved}}
+            <a class="btn btn-info notes" data-id={{this._id}}>Article Notes</a>        
+            <a class="btn btn-danger delete" data-id={{this._id}}>Delete from Saved</a>
+          {{else}}
+            <a class="btn btn-success save" data-id={{this._id}}>Save Article</a>
+          {{/if}}
+        </h4>
+      </div>
+      <div class="panel-body">
+        "{{this.summary}}"
+      </div>
+    </div> 
+    {{/each}}
+  {{else}}
+    <div class='alert alert-warning text-center'>
+      <h4>No unsaved articles, please click scrape"</h4>
+    </div> 
+  {{/if}}
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="app.js"></script>
 {{!-- <<form id="contact-form" action='/'>
     {{!-- <input type="name" id="name" name="name" value="{{this.friendData.name}}" style="display: none;"> 
 
     <input type="submit" style="float:left;margin-top: 2.4%;">
-</form>--}}
+</form>--
 
 button onclick="location.href = '../public/index.html';" id="myButton" class="float-left submit-button" >
-Press here to see your results.</button> 
+Press here to see your results.</button>}}

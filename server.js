@@ -5,7 +5,7 @@ var logger = require('morgan');
 var mongoose = require('mongoose');
 
 // Scraping tools
-var request = require('request');
+var axios = require('axios');
 var cheerio = require('cheerio');
 
 var PORT = process.env.PORT || 3000;
@@ -30,7 +30,7 @@ mongoose.Promise = Promise;
 
 mongoose.connect(MONGODB);
 
-// Show any mongoose errors
+/*/ Show any mongoose errors
 mongoose.on('error', function(err) {
     console.log('Mongoose Error: ', err);
 });
@@ -38,7 +38,7 @@ mongoose.on('error', function(err) {
 // Once logged in to the db through mongoose, log a success message
 mongoose.once('open', function() {
     console.log('Mongoose connection successful.');
-});
+});*/
 
 //app.use(routes)
 // ROUTES
@@ -65,11 +65,12 @@ app.get('/articles', function(req, res){
 //save all the unique articles to the db and return data as json to client side js
 app.get('/api/scrape', function(req, res) {
 
-    // Grab the body of the html with request
-    request('https://www.reddit.com/r/news/', function(error, response, html) {
+    // Grab the body request
+    axios.get('https://www.reddit.com/r/news/')
+    .then(function(response) {
 
         // Load that into cheerio and save it to $ for a shorthand selector
-        var $ = cheerio.load(html);
+        var $ = cheerio.load(response.data);
 
         // Grab every h2 within an article tag
         $('p.title').each(function(i, element) {
@@ -104,7 +105,7 @@ app.get('/api/scrape', function(req, res) {
 app.get('/api/articles/:id', function(req, res){
     // using the id passed in the id parameter,
     // prepare a query that finds the matching one in our db...
-    Article.findOne({'_id': req.params.id})
+    db.Article.findOne({'_id': req.params.id})
     // and populate all of the notes associated with it.
         .populate('note')
         // now, execute our query
@@ -120,15 +121,49 @@ app.get('/api/articles/:id', function(req, res){
         });
 });
 
-//update an articles saved status to true to false ove false to true
+//update an articles saved status that is true to false or false to true
 // send back json to client side js
-app.put('/api/articles/:id', function(req, res){
+app.put('/api/articles/:id/save', function(req, res){
+    db.Article.update({_id: req.params.id}, { $set: {isSaved: true } })
+    .exec(function(err, doc){
+        // log any errors
+        if (err){
+            console.log(err);
+        }
+        // otherwise, send the doc to the browser as a json object
+        else {
+            res.json(doc);
+        }
+    });
+});
 
+app.put('/api/articles/:id/unsave', function(req, res){
+    db.Article.update({_id: req.params.id}, { $set: {isSaved: fasle } })
+    .exec(function(err, doc){
+        // log any errors
+        if (err){
+            console.log(err);
+        }
+        // otherwise, send the doc to the browser as a json object
+        else {
+            res.json(doc);
+        }
+    });
 });
 
 //optional to delete article from db
 app.delete('/api/articles/:id', function(req, res) {
-
+    db.Note.findByIdAndRemove(req.params.id)
+    .exec(function(err, doc){
+        // log any errors
+        if (err){
+            console.log(err);
+        }
+        // otherwise, send the doc to the browser as a json object
+        else {
+            res.json(doc);
+        }
+    });
 })
 
 // replace the existing note of an article with a new one 

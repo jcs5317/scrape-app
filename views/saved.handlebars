@@ -1,0 +1,49 @@
+<div class="container-fluid article-container">
+
+  {{#if articles}}
+    {{#each articles}}
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h4>
+          <a class="article-link" target="_blank" href="{{this.link}}">{{this.title}}</a>
+          {{#if this.isSaved}}
+            <button type="button" class="btn btn-success myBtn" data-id={{this._id}} id="myBtn">Add a Note</button> 
+            {{#unless notes}}
+              <a class="btn btn-danger delete" data-id={{this._id}}>Delete from Saved</a>
+            {{/unless}}
+          {{else}}
+            <a class="btn btn-success save" data-id={{this._id}}>Save Article</a>
+          {{/if}}
+        </h4>
+      </div>
+      <div class="panel-body">
+        "{{this.summary}}"
+      </div>
+      {{#if notes}}
+      <div class="container">
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th>Notes</th>
+        <th> </th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each notes}}
+      <tr>
+        <td>{{this.comment}}</td>
+        <td style="text-align: right;"><a class="btn btn-danger delete-note" data-id={{this._id}}>Delete This Note</a></td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</div>
+      {{/if}}
+    </div> 
+    {{/each}}
+  {{else}}
+    <div class='alert alert-warning text-center'>
+      <h4>There are no saved articles.  Go back to home and save at least one article"</h4>
+    </div> 
+  {{/if}}
+</div>
