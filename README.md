@@ -1,8 +1,9 @@
 # scrape-app
 All the News That's Fit to Scrape
 
-## Use:
-This app scrapes a news site, collect articles, and allows a user to 'save' and make notes to list of articles.
+## How to use:
+- This app scrapes a news site with just a click.
+- Now the collection of articles may be 'saved' and even notes can be added to list of articles.
 
 ## Technologies:
 
@@ -12,7 +13,7 @@ mongoose,
 cheerio, 
 axios
 
-## Deployment:
+## Deployed site
+https://lit-woodland-65523.herokuapp.com/
 
-lit-woodland-65523
 
