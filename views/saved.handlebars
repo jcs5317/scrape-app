@@ -6,7 +6,7 @@
       <div class="panel-heading">
         <h4>
           <a class="article-link" target="_blank" href="{{this.link}}">{{this.title}}</a>
-          {{#if this.isSaved}}
+          {{#if this.saved}}
             <button type="button" class="btn btn-success myBtn" data-id={{this._id}} id="myBtn">Add a Note</button> 
             {{#unless notes}}
               <a class="btn btn-danger delete" data-id={{this._id}}>Delete from Saved</a>

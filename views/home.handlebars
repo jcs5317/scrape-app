@@ -9,7 +9,7 @@
       <div class="panel-heading">
         <h4>
           <a class="article-link" target="_blank" href="{{this.link}}">{{this.title}}</a>
-          {{#if this.isSaved}}
+          {{#if this.saved}}
             <a class="btn btn-info notes" data-id={{this._id}}>Article Notes</a>        
             <a class="btn btn-danger delete" data-id={{this._id}}>Delete from Saved</a>
           {{else}}
