@@ -24,11 +24,11 @@ app.engine('handlebars', exphbs({defaultLayout: 'main'}));
 app.set('view engine', 'handlebars');
 
 // Database configuration with mongoose
-var MONGODB = process.env.MONGODB_URI || "mongodb://localhost/newsdb";
+var MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost/newsdb";
 
 mongoose.Promise = Promise;
 
-mongoose.connect(MONGODB);
+mongoose.connect(MONGODB_URI, { useNewUrlParser: true});
 
 /*/ Show any mongoose errors
 mongoose.on('error', function(err) {
@@ -49,24 +49,12 @@ app.get('/', function (req, res) {
     res.render('home');
 });
 
-// this will get the articles we scraped from the mongoDB
-//html route
-//find where the save is true
-app.get('/articles', function(req, res){
-    // grab every doc in the Articles array
-    Article.find()
-        .then(function (doc, err){
-            console.log(doc)
-            res.render("saved", doc)
-        })
-});
-
 // when button is clicked o home page that scrapes the website
 //save all the unique articles to the db and return data as json to client side js
-app.get('/api/scrape', function(req, res) {
+app.get('/scrape', function(req, res) {
 
     // Grab the body request
-    axios.get('https://www.reddit.com/r/news/')
+    axios.get('https://old.reddit.com/r/news/')
     .then(function(response) {
 
         // Load that into cheerio and save it to $ for a shorthand selector
@@ -79,10 +67,23 @@ app.get('/api/scrape', function(req, res) {
             var result = {};
 
             // Save the text and href of every link as properties of the result obj
-            result.title = $(this).text();
-            result.link = $(this).children().attr('href');
+            result.title = $(this)
+                .text();
+            result.link = $(this)
+                .children()
+                .attr('href');
 
-            // Using the Article model, create a new entry and pass in the result object (title and link)
+            console.log(result);
+
+            db.Article.create(result)
+                .then(function (dbArticle) {
+                    console.log(dbArticle);
+                })
+                .catch(function (err) {
+                    console.log(err);
+                });
+
+            /*// Using the Article model, create a new entry and pass in the result object (title and link)
             var entry = new Article (result);
 
             // Save that entry to the db
@@ -93,113 +94,101 @@ app.get('/api/scrape', function(req, res) {
                     console.log(err);
                 else
                     console.log(doc);
-            });
+            });*/
         });
-        res.render('home',{
-            scrapesource: "Reddit"
-        });
+
+        res.redirect('/');
     });
 });
 
+// this will get the articles we scraped from the mongoDB
+//html route
+//find where the save is true
+app.get('/articles', function(req, res){
+    // grab every doc in the Articles array
+    db.Article.find({})
+        .then(function (dbArticle) {
+            res.json (dbArticle);
+            console.log(dbArticle);
+        
+        })
+        .catch(function (err) {
+            res.sjson(err);
+        });
+});
+
+
 // grab an article by it's ObjectId optional
-app.get('/api/articles/:id', function(req, res){
+app.get('/articles/:id', function(req, res){
     // using the id passed in the id parameter,
     // prepare a query that finds the matching one in our db...
     db.Article.findOne({'_id': req.params.id})
     // and populate all of the notes associated with it.
         .populate('note')
         // now, execute our query
-        .exec(function(err, doc){
-            // log any errors
-            if (err){
-                console.log(err);
-            }
-            // otherwise, send the doc to the browser as a json object
-            else {
-                res.json(doc);
-            }
+        .then(function (dbArticle) {
+            res.json(dbArticle);
+        })
+        .catch(function (err) {
+            res.json(err);
         });
+});
+
+//Route for saved articles
+app.get("/articles/saved", function (req, res) {
+    db.Article.find({ saved : true })
+        .then(function (dbArticle) {
+            res.json(dbArticle);
+            console.log(dbArticle);
+        })
+        .catch(function (err) {
+            res.json(err);
+        });
+});
+
+// Route to delete scraped articles
+app.get("/delete", function (req, res) {
+    db.Article.remove({}, function (err) {
+        if (err) throw err;
+    })
+        .then(function (result) {
+            console.log("Articles Deleted");
+        })
+        .catch(function (err) {
+            res.json(err);
+        });
+    res.redirect("/");
 });
 
 //update an articles saved status that is true to false or false to true
 // send back json to client side js
-app.put('/api/articles/:id/save', function(req, res){
-    db.Article.update({_id: req.params.id}, { $set: {isSaved: true } })
-    .exec(function(err, doc){
-        // log any errors
-        if (err){
-            console.log(err);
-        }
-        // otherwise, send the doc to the browser as a json object
-        else {
-            res.json(doc);
-        }
+app.put('/articles/update', function(req, res){
+    db.Article.findOneAndUpdate({_id: req.body.id},{ saved : true })
+    .then(function (dbArticle){
+        res.json(dbArticle);
+    })
+    .catch(function(err) {
+        res.json(err);
     });
 });
 
-app.put('/api/articles/:id/unsave', function(req, res){
-    db.Article.update({_id: req.params.id}, { $set: {isSaved: fasle } })
-    .exec(function(err, doc){
-        // log any errors
-        if (err){
-            console.log(err);
-        }
-        // otherwise, send the doc to the browser as a json object
-        else {
-            res.json(doc);
-        }
-    });
-});
-
-//optional to delete article from db
-app.delete('/api/articles/:id', function(req, res) {
-    db.Note.findByIdAndRemove(req.params.id)
-    .exec(function(err, doc){
-        // log any errors
-        if (err){
-            console.log(err);
-        }
-        // otherwise, send the doc to the browser as a json object
-        else {
-            res.json(doc);
-        }
-    });
-})
-
-// replace the existing note of an article with a new one 
-app.post('/api/notes/articles/:id', function(req, res){
+// Route to replace the existing note of an article with a new one 
+app.post('/articles/:id', function(req, res){
     // create a new note and pass the req.body to the entry.
-    var newNote = new Note(req.body);
+    db.Note.create(req.body)
+        .then(function(dbNote){
+            return db.Article.findOneAndUpdate({ _id: req.params.id }, { note: dbNote._id }, { new: true });
+        })
+        .then(function (dbArticle) {
+            res.json(dbArticle);
+        })
+        .catch(function (err) {
+            res.json(err);
+        });
+});
 
-    // and save the new note the db
-    newNote.save(function(err, doc){
-        // log any errors
-        if(err){
-            console.log(err);
-        }
-        // otherwise
-        else {
-            // using the Article id passed in the id parameter of our url,
-            // prepare a query that finds the matching Article in our db
-            // and update it to make it's lone note the one we just saved
-            Article.findOneAndUpdate({'_id': req.params.id}, {'note':doc._id})
-            // execute the above query
-                .exec(function(err, doc){
-                    // log any errors
-                    if (err){
-                        console.log(err);
-                    } else {
-                        // or send the document to the browser
-                        res.send(doc);
-                    }
-                });
-        }
-    });
-})
 
-// update the existing note of an article optional
-app.put('/api/notes/:idi/articles/:id')
-// listen on port 3000
+// listener
 app.listen(PORT, function() {
     console.log('App running on port ' + PORT + ' !');
 });
