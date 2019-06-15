@@ -11,11 +11,11 @@
                 <a class="nav-link" href="/">Home</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#" id="saved">Saved</a>
+                <a class="nav-link" href="/saved" id="saved">Saved</a>
             </li>
         </ul>
         <ul class="nav ml-auto">
-            <li><a href="/scrape"><button class="btn btn-light ml-auto">Scrape Articles</button></a>
+            <li><button class="btn btn-light ml-auto" id="scrape">Scrape Articles</button>
             <a href="/delete"><button class="btn btn-light ml-auto">Delete Articles</button></a></li>
         </ul>
     </nav>
@@ -29,26 +29,101 @@
         </div>       
 <div class="row" id="second-row">
     <div class="col-md-12">
-    {{#if articles}}
-    <ol>
+  {{#if articles}}
+    <ol id="article-wrap">
       {{#each articles}}
         <li>
-          Title: {{title}}<br>
-          <button data-articleID="{{_id}}" class="change-save btn btn-warning" data-status="{{isSaved}}">
-          {{#if isSaved}}
+          <p>Title: {{title}}</p>
+          <p>scraped: {{date}}</p>
+          <p>Link: {{link}}</p>
+          <button data-articleID="{{_id}}" class="change-save btn btn-warning" data-status="{{saved}}">
+          
+          {{#if saved}}
             Unsave Article
           {{else}}
             Save Article
           {{/if}}
-        </button><br>
-          Link: {{link}}<br>
-          Summary: {{summary}}<br><br>
+        </button>
         </li>
       {{/each}}
     </ol>
     {{else}}
-      <h2 align="center">No articles are available now.</h2>
+      <h2 id="no-articles" align="center">No articles are available now.</h2>
+      <ol id="article-wrap"></ol>
     {{/if}}
     </div>
   </div>
 </div>
+
+
+<script>
+
+$(document).ready(function(){
+  $("#scrape").click(function(){
+    // show loading scrape.
+    $.get('/api/scrape', function(res){
+      if(res.sucess){
+        alert("scape complete! " + res.articles.length + " articles were scraped.");
+
+        res.articles.forEach(function(article){
+          var li = $("<li>");
+          var title = $("<p>").text("Title: " + article.title)
+          var date = $("<p>").text("Date:" + article.date)
+          var link = $("<p>").text("Link:" + article.link)
+          var button = $("<button>").attr("data-articleID", article["_id"]).addClass("change-save btn btn-warning").attr("data-status", article.saved);
+          
+          if(article.saved) {
+            button.text("Unsave Article")
+          } else {
+            button.text("Save Article")
+          }
+          
+          $(li).append(title, date, link, button);
+
+          $("#article-wrap").append(li);
+          $("#no-articles").hide();
+        })
+
+      } else {
+        alert(res.message)
+      } 
+    })
+  })
+
+  $(document).on('click', ".change-save", function(){
+    // update artilce  save : t/f
+    var id = $(this).data("articleid")
+    var status = {
+      saved: $(this).data("status")
+    }
+
+
+    var self = $(this)
+
+    $.ajax({
+      url: '/articles/'+id,
+      type: 'put',
+      data: status,  
+      success: function(result) {
+        location.reload();
+
+     /* if(result.saved === false) {
+        self.text("Unsave Article")
+        self.attr("data-status", true)
+
+      } else {
+        self.text("Save Article")
+        self.attr("data-status", false)
+      } */
+       
+          // Do something with the result
+      }
+    })
+})
+
+
+})  
+
+
+  
+</script>

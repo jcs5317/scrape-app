@@ -3,6 +3,7 @@ var express = require('express');
 var exphbs  = require('express-handlebars');
 var logger = require('morgan');
 var mongoose = require('mongoose');
+var moment = require('moment');
 
 // Scraping tools
 var axios = require('axios');
@@ -24,7 +25,7 @@ app.engine('handlebars', exphbs({defaultLayout: 'main'}));
 app.set('view engine', 'handlebars');
 
 // Database configuration with mongoose
-var MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost/newsdb";
+var MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost/newsdb25";
 
 mongoose.Promise = Promise;
 
@@ -45,18 +46,76 @@ mongoose.once('open', function() {
 // ======
 
 app.get('/', function (req, res) {
+    db.Article.find({})
+        .then(function (dbArticle) {
+            var hbsArticleObject = {
+                articles: []
+            };
 
-    res.render('home');
+            dbArticle.forEach(function(article) {
+                hbsArticleObject.articles.push({
+                    title: article.title,
+                    saved: article.saved,
+                    link: article.link,
+                    date: moment(article.date).format('MM/DD/YY MM:HH A'),
+                    note: article.note,
+                    _id: article._id
+                }) 
+            });
+            res.render("home", hbsArticleObject)
+        })
+        .catch(function (err) {
+            res.sjson(err);
+        });
 });
 
 // when button is clicked o home page that scrapes the website
 //save all the unique articles to the db and return data as json to client side js
-app.get('/scrape', function(req, res) {
+app.get('/api/scrape', function(req, res) {
+    // call step 1
+    scrape()
+    // after complete
+    .then(function(articles){
+        // call step 2
+        createArticles(articles)
+        // after complete
+        .then(function(dbArticles){
+            // step 3
+            // send data to client (html)
+            if(dbArticles === false || dbArticles === "fasle") {
+                res.json({sucess: false, message: "no new articles were scraped."})
+            } else {
+                res.json({sucess: true, articles: dbArticles})
+            }
+           
+        }).catch(function(err){
+            console.log(err)
+            res.json({sucess: err, message: "no new articles were scraped."})
+        })
+    })
+    
+});
 
-    // Grab the body request
-    axios.get('https://old.reddit.com/r/news/')
+// step 2
+// returns array of db article objs or a false (no db articles created)
+function createArticles(articles){
+    return db.Article.create(articles)
+        .then(function (dbArticle) {
+            // console.log(dbArticle.length)
+            return dbArticle
+        })
+        .catch(function (err) {
+            return false
+        });
+}
+
+// step 1
+// returns a array of article objs
+function scrape(){
+    return axios.get('https://old.reddit.com/r/news/')
     .then(function(response) {
-
+        console.log("scraping");
+         var articles = [];
         // Load that into cheerio and save it to $ for a shorthand selector
         var $ = cheerio.load(response.data);
 
@@ -69,19 +128,17 @@ app.get('/scrape', function(req, res) {
             // Save the text and href of every link as properties of the result obj
             result.title = $(this)
                 .text();
-            result.link = $(this)
+
+            if( $(this).children().attr('href')){
+                result.link = $(this)
                 .children()
                 .attr('href');
+            } else {
+                result.link = "not available"
+            }
 
-            console.log(result);
-
-            db.Article.create(result)
-                .then(function (dbArticle) {
-                    console.log(dbArticle);
-                })
-                .catch(function (err) {
-                    console.log(err);
-                });
+           
+            articles.push(result)
 
             /*// Using the Article model, create a new entry and pass in the result object (title and link)
             var entry = new Article (result);
@@ -96,75 +153,50 @@ app.get('/scrape', function(req, res) {
                     console.log(doc);
             });*/
         });
-
-        res.redirect('/');
+       
+        return articles
     });
-});
-
-// this will get the articles we scraped from the mongoDB
-//html route
-//find where the save is true
-app.get('/articles', function(req, res){
-    // grab every doc in the Articles array
-    db.Article.find({})
-        .then(function (dbArticle) {
-            res.json (dbArticle);
-            console.log(dbArticle);
-        
-        })
-        .catch(function (err) {
-            res.sjson(err);
-        });
-});
-
-
-// grab an article by it's ObjectId optional
-app.get('/articles/:id', function(req, res){
-    // using the id passed in the id parameter,
-    // prepare a query that finds the matching one in our db...
-    db.Article.findOne({'_id': req.params.id})
-    // and populate all of the notes associated with it.
-        .populate('note')
-        // now, execute our query
-        .then(function (dbArticle) {
-            res.json(dbArticle);
-        })
-        .catch(function (err) {
-            res.json(err);
-        });
-});
+}
 
 //Route for saved articles
-app.get("/articles/saved", function (req, res) {
+app.get("/saved", function (req, res) {
     db.Article.find({ saved : true })
         .then(function (dbArticle) {
-            res.json(dbArticle);
-            console.log(dbArticle);
-        })
-        .catch(function (err) {
-            res.json(err);
-        });
-});
+            var hbsArticleObject = {
+                articles: []
+            };
 
-// Route to delete scraped articles
-app.get("/delete", function (req, res) {
-    db.Article.remove({}, function (err) {
-        if (err) throw err;
-    })
-        .then(function (result) {
-            console.log("Articles Deleted");
+            dbArticle.forEach(function(article) {
+                hbsArticleObject.articles.push({
+                    title: article.title,
+                    saved: article.saved,
+                    link: article.link,
+                    date: moment(article.date).format('MM/DD/YY MM:HH A'),
+                    note: article.note,
+                    _id: article._id
+                }) 
+            });
+            res.render("saved", hbsArticleObject)
         })
         .catch(function (err) {
             res.json(err);
         });
-    res.redirect("/");
 });
 
 //update an articles saved status that is true to false or false to true
 // send back json to client side js
-app.put('/articles/update', function(req, res){
-    db.Article.findOneAndUpdate({_id: req.body.id},{ saved : true })
+// mostly working 0_o
+// db givesd back og vervsion not updated after updating
+app.put('/articles/:id', function(req, res){
+    // console.log(req.params.id)
+    console.log("BODY original status:", req.body.saved)
+    /// false
+    // true
+    var status = (req.body.saved === 'true' || req.body ===  true)? false : true;
+    // console.log("new status:", status)
+    db.Article.findOneAndUpdate({_id: req.params.id},{ saved : status })
     .then(function (dbArticle){
+        // console.log("article after update: should match new status:", dbArticle)
         res.json(dbArticle);
     })
     .catch(function(err) {
@@ -172,14 +204,15 @@ app.put('/articles/update', function(req, res){
     });
 });
 
-// Route to replace the existing note of an article with a new one 
+// // Route to replace the existing note of an article with a new one 
 app.post('/articles/:id', function(req, res){
     // create a new note and pass the req.body to the entry.
     db.Note.create(req.body)
         .then(function(dbNote){
-            return db.Article.findOneAndUpdate({ _id: req.params.id }, { note: dbNote._id }, { new: true });
+            return db.Article.findOneAndUpdate({ _id: req.params.id }, { note: dbNote._id });
         })
         .then(function (dbArticle) {
+            console.log(dbArticle)
             res.json(dbArticle);
         })
         .catch(function (err) {

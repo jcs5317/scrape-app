@@ -47,3 +47,55 @@
     </div> 
   {{/if}}
 </div> --}}
+
+
+<ol id="article-wrap">
+      {{#each articles}}
+        <li>
+          <p>Title: {{title}}</p>
+          <p>scraped: {{date}}</p>
+          <p>Link: {{link}}</p>
+          <button data-articleID="{{_id}}" class="change-save btn btn-warning" data-status="{{saved}}">
+          
+          {{#if saved}}
+            Unsave Article
+          {{else}}
+            Save Article
+          {{/if}}
+        </button>
+        </li>
+      {{/each}}
+    </ol>
+
+    <script>
+      /*
+      using hdlbars display note if one exists
+        in the html create a form to add a note 
+        create a button to save the note
+        on click of save button
+        post input field data to sever /article/atcleid
+        refresh the page on sucess
+      
+      */
+
+  $(document).on('click', ".change-save", function(){
+    // update artilce  save : t/f
+    var id = $(this).data("articleid")
+    var status = {
+      saved: $(this).data("status")
+    }
+
+
+    var self = $(this)
+
+    $.ajax({
+      url: '/articles/'+id,
+      type: 'put',
+      data: status,  
+      success: function(result) {
+       location.reload();
+          // Do something with the result
+      }
+    })
+})
+    </script>
